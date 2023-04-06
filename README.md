@@ -4,7 +4,7 @@ This repository contains a Python script `mismatch.py` that can be used to calcu
 
 ## Usage
 
-### To calculate the `y_pred` values for a set of parameters and original vs variant sequences, run the following command:
+### To calculate the y_pred values and mismatches spread evenly across a range of values using existing parameters:
 
 ```
 python mismatch.py mismatches --parameters parameters.csv --min 0 --max 1 --step 0.1 --spacers_file original_guides.tsv
@@ -35,7 +35,7 @@ This will output a table of original sequences, variant sequences, change descri
 | AAAAACTTGCTGGCCGCTAC | AAAAACTTGCTAGCCGCTAC | G12A               | 0.6951 |
 
 
-### To recalculate `y_pred` values for a set of parameters and existing mismatches, run the following command:
+### To recalculate `y_pred` values for a set of parameters and existing mismatches:
 
 ```
 python mismatch.py recalculate --parameters parameters.csv --existing_mismatches mismatches.tsv
