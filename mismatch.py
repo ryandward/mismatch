@@ -55,13 +55,14 @@ def generate_mismatches(spacers, min_score, max_score, step, parameters):
                     if mismatch not in [x[0] for x in mismatch_list]:
                         closest_score = mismatch_score
                         closest_mismatch = mismatch
-            mismatch_list.append((closest_mismatch, closest_score))
+            if closest_mismatch is not None:
+                mismatch_list.append((closest_mismatch, closest_score))
 
         for i, (mismatch, score) in enumerate(mismatch_list):
-            target_mismatch = spacer[:mismatch[0]] + mismatch[1] + spacer[mismatch[0]+1:]
-            change_description = f"{spacer[mismatch[0]]}{mismatch[0]+1}{mismatch[1]}"
-            print(f"{spacer}\t{target_mismatch}\t{change_description}\t{score:.4f}")
-
+            if mismatch is not None:
+                target_mismatch = spacer[:mismatch[0]] + mismatch[1] + spacer[mismatch[0]+1:]
+                change_description = f"{spacer[mismatch[0]]}{mismatch[0]+1}{mismatch[1]}"
+                print(f"{spacer}\t{target_mismatch}\t{change_description}\t{score:.4f}")
 
 def main(args):
     logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=getattr(logging, args.verbosity.upper()))
@@ -77,7 +78,7 @@ def main(args):
         generate_mismatches(spacers, args.min, args.max, args.step, params)
     elif args.mode == "recalculate":
         try:
-            data = pd.read_csv(args.input_data_file, sep="\t")
+            data = pd.read_csv(args.existing_mismatches, sep="\t")
         except Exception as e:
             logging.error(f"Error reading input data file: {e}")
             sys.exit(1)
@@ -88,10 +89,10 @@ def main(args):
 
         logging.info("Calculating y_pred for each row...")
         new_y_pred_column_name = 'y_pred_new' if 'y_pred' in data.columns else 'y_pred'
-        data[new_y_pred_column_name] = data.apply(lambda row: calculate_y_pred(row['original'], row['variant'], params['GC_content'], params), axis=1)
+        data[new_y_pred_column_name] = data.apply(lambda row: round(calculate_y_pred(row['original'], row['variant'], params['GC_content'], params), 4), axis=1)
 
         logging.info("Displaying results:")
-        print(data.to_string(index=False, col_space=0, justify='left'))
+        print(data.to_csv(sep="\t", index=False))
 
         logging.info("Done.")
 
@@ -100,14 +101,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate mismatches for a list of spacers and/or recalculate y_pred.")
     parser.add_argument("mode", choices=["mismatches", "recalculate"], help="Choose the mode of operation: 'mismatches' to generate mismatches, 'recalculate' to recalculate y_pred.")
     parser.add_argument("--spacers_file", help="Path to the file containing original spacers (one per line) (required for mismatches mode).")
-    parser.add_argument("--input_data_file", help="Path to the input data file (TSV format) (required for recalculate mode).")
+    parser.add_argument("--existing_mismatches", help="Path to the input data file (TSV format) (required for recalculate mode).")
     parser.add_argument("--parameters_file", required=True, help="Path to the parameters file (CSV format).")
     parser.add_argument("--verbosity", choices=["debug", "info", "warning", "error", "critical"], default="info", help="Set the logging verbosity level (default: info).")
+    parser.add_argument("--min", type=float, default=0, help="Minimum desired efficacy (default: 0) (required for mismatches mode).")
+    parser.add_argument("--max", type=float, default=1, help="Maximum desired efficacy (default: 1) (required for mismatches mode).")
+    parser.add_argument("--step", type=float, default=0.1, help="Step between desired efficacies (default: 0.1) (required for mismatches mode).")
     args = parser.parse_args()
 
     if args.mode == "mismatches" and args.spacers_file is None:
         parser.error("The --spacers_file option is required for mismatches mode.")
-    elif args.mode == "recalculate" and args.input_data_file is None:
-        parser.error("The --input_data_file option is required for recalculate mode.")
+    elif args.mode == "recalculate" and args.existing_mismatches is None:
+        parser.error("The --existing_mismatches option is required for recalculate mode.")
 
     main(args)
