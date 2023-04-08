@@ -62,7 +62,7 @@ def print_mismatches(mismatch_list, spacer):
             print('\t'.join(row))
 
 
-def generate_mismatches(spacers, min_score, max_score, step, parameters):
+def generate_mismatches(spacers, min_score, max_score, step, parameters, spacer_original):
     """Generate mismatches for a list of spacers based on desired scores."""
     nucleotides = ['A', 'C', 'G', 'T']
 
@@ -84,7 +84,7 @@ def generate_mismatches(spacers, min_score, max_score, step, parameters):
             if closest_mismatch is not None:
                 mismatch_list.append((closest_mismatch, closest_score))
 
-        print_mismatches(mismatch_list, spacer)
+    print_mismatches(mismatch_list, spacer_original)  # Use spacer_original instead of spacer
 
 
 def main(args):
@@ -95,10 +95,13 @@ def main(args):
 
     if args.mode == 'mismatches':
         with open(args.spacers_file, 'r') as f:
-            spacers = [line.strip() for line in f.readlines() if line.strip()]
+            spacers_original = [line.strip() for line in f.readlines() if line.strip()]
+            spacers = [spacer.upper() for spacer in spacers_original]  # Capitalize the sequences for processing
 
         generate_header()
-        generate_mismatches(spacers, args.min, args.max, args.step, params)
+        for spacer_original, spacer in zip(spacers_original, spacers):  # Modify this line to iterate over both original and capitalized sequences
+            generate_mismatches([spacer], args.min, args.max, args.step, params, spacer_original)  # Pass spacer_original as an additional argument
+
     elif args.mode == 'recalculate':
         try:
             data = pd.read_csv(args.existing_mismatches, sep='\t')
@@ -106,19 +109,30 @@ def main(args):
             logging.error(f'Error reading input data file: {e}')
             sys.exit(1)
 
-        if not {'original', 'variant'}.issubset(data.columns):
-            logging.error("Input data file must have 'original' and 'variant' columns.")
+        original_aliases = {'original', 't_seq', 'perfect'}
+        variant_aliases = {'variant', 'q_seq', 'mismatch'}
+
+        original_col = original_aliases.intersection(data.columns)
+        variant_col = variant_aliases.intersection(data.columns)
+
+        if not (len(original_col) == 1 and len(variant_col) == 1):
+            logging.error("Input data file must have one of 'original', 't_seq', or 'perfect' columns and one of 'variant', 'q_seq', or 'mismatch' columns.")
             sys.exit(1)
+
+        original_col = original_col.pop()  # Get the actual column name used
+        variant_col = variant_col.pop()  # Get the actual column name used
+
+        data[f'{original_col}_upper'] = data[original_col].str.upper()
+        data[f'{variant_col}_upper'] = data[variant_col].str.upper()
 
         logging.info('Calculating y_pred for each row...')
         new_y_pred_column_name = 'y_pred_new' if 'y_pred' in data.columns else 'y_pred'
-        data[new_y_pred_column_name] = data.apply(lambda row: f"{calculate_y_pred(row['original'], row['variant'], params['GC_content'], params):.4f}", axis=1)
+        data[new_y_pred_column_name] = data.apply(lambda row: f"{calculate_y_pred(row[f'{original_col}_upper'], row[f'{variant_col}_upper'], params['GC_content'], params):.4f}", axis=1)
 
         logging.info('Displaying results:')
-        print(data.to_csv(sep='\t', index=False))
+        print(data.drop([f'{original_col}_upper', f'{variant_col}_upper'], axis=1).to_csv(sep='\t', index=False))
 
         logging.info('Done.')
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate mismatches for a list of spacers and/or recalculate y_pred.')
