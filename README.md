@@ -6,6 +6,8 @@ This repository contains a Python script `mismatch.py` that can be used to calcu
 
 ### To calculate the y_pred values and mismatches spread evenly across a range of values using existing parameters:
 
+The [parameters](https://github.com/traeki/sgRNAs-for-mismatch-CRISPRi/blob/8b76b67f5dd9c69bf9f40917d8cc826890dbf15a/model_param.csv) provided here are calculated and posted by John Hawkins.
+
 ```
 python mismatch.py mismatches --parameters parameters.csv --min 0 --max 1 --step 0.1 --spacers_file original_guides.tsv
 ```
